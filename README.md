@@ -93,3 +93,55 @@ You should receive a response like this:
 ```
 
 You have now successfully called two different services (REST and gRPC) that use the exact same DTO definition.
+
+### 4. Test the Messaging Endpoints
+
+The project is also configured to produce and consume messages using Kafka and RabbitMQ, using the same Protobuf `User` DTO.
+
+#### Prerequisites: Running Kafka and RabbitMQ
+
+You need running instances of Kafka and RabbitMQ. The easiest way to do this is with Docker.
+
+**RabbitMQ:**
+```bash
+docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+```
+
+**Kafka (with Zookeeper):**
+```bash
+# Start Zookeeper
+docker run -d --name zookeeper -p 2181:2181 wurstmeister/zookeeper
+
+# Start Kafka
+docker run -d --name kafka -p 9092:9092 \
+  -e KAFKA_ADVERTISED_HOST_NAME=localhost \
+  -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
+  -e KAFKA_CREATE_TOPICS="users.topic:1:1" \
+  --link zookeeper \
+  wurstmeister/kafka
+```
+*Note: It might take a minute for the brokers to be fully available.*
+
+#### Triggering the Producers
+
+With the `user-service` still running, use `curl` to send a POST request to the `/api/users/publish` endpoint. This endpoint will take the User JSON, convert it to the Protobuf `User` object, and then send it to both Kafka and RabbitMQ.
+
+```bash
+curl -X POST http://localhost:8080/api/users/publish \
+-H "Content-Type: application/json" \
+-d '{"id": "789", "username": "event-user", "email": "event-user@example.com"}'
+```
+
+You should get a response: `User published to Kafka and RabbitMQ: 789`
+
+#### Verifying Consumption
+
+Check the logs of the running `user-service` application. You will see output from both the Kafka and RabbitMQ consumers, confirming that they received the message and deserialized it back into the `User` object successfully.
+
+```
+# Example output for Kafka
+... INFO ... [o.s.k.l.KafkaMessageListenerContainer$ListenerConsumer] Consumed Kafka message -> User ID: 789, Username: event-user
+
+# Example output for RabbitMQ
+... INFO ... [o.s.a.r.l.SimpleMessageListenerContainer] Consumed RabbitMQ message -> User ID: 789, Username: event-user
+```
