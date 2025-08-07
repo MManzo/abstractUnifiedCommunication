@@ -62,103 +62,105 @@ The service will start up.
 
 ### 3. Test the Endpoints
 
-You can now test both endpoints using standard tools.
+You can now test the various endpoints, which all trigger the same underlying business logic.
 
-#### Testing the REST Endpoint
+#### A) Testing the REST Interface
 
-Open a new terminal and use `curl` to send a request to the REST API:
+Open a new terminal.
 
+**1. Get User:**
+Send a `POST` request with a `GetUserRequest` body.
 ```bash
-curl http://localhost:8080/api/users/123
+curl -X POST http://localhost:8080/api/users/get \
+-H "Content-Type: application/json" \
+-d '{"id": "123"}'
 ```
-
-You should receive a JSON response like this:
+*Response:*
 ```json
 {
   "id": "123",
-  "username": "testuser-rest",
-  "email": "testuser-rest@example.com"
+  "username": "command-pattern-user",
+  "email": "command.user@example.com"
 }
 ```
 
-#### Testing the gRPC Endpoint
-
-You can use a tool like `grpcurl` to test the gRPC endpoint. First, list the available services (this works because we enabled gRPC reflection).
-
+**2. Create User (and trigger messaging):**
+Send a `POST` request with a `CreateUserRequest` body. This endpoint will also trigger the Kafka and RabbitMQ producers.
 ```bash
-# List services
-grpcurl -plaintext localhost:9090 list
+curl -X POST http://localhost:8080/api/users/create \
+-H "Content-Type: application/json" \
+-d '{"username": "new-rest-user", "email": "new-rest@example.com"}'
+```
+*Response (the user ID will be random):*
+```json
+{
+  "id": "c7a8f2e9-a3b4-4c1d-8e6f-ac72a8d3e5d7",
+  "statusMessage": "User 'new-rest-user' created successfully."
+}
+```
 
-# List methods for our service
+#### B) Testing the gRPC Interface
+
+You can use a tool like `grpcurl`.
+
+**1. List Methods:**
+The `UserService` now exposes two methods.
+```bash
 grpcurl -plaintext localhost:9090 list com.unifieddto.api.user.UserService
 ```
-
-Now, call the `GetUser` method:
-
-```bash
-# Call the GetUser method
-grpcurl -plaintext -d '{"id": "456"}' localhost:9090 com.unifieddto.api.user.UserService/GetUser
+*Response:*
+```
+com.unifieddto.api.user.UserService.CreateUser
+com.unifieddto.api.user.UserService.GetUser
 ```
 
-You should receive a response like this:
+**2. Get User:**
+```bash
+grpcurl -plaintext -d '{"id": "456"}' \
+localhost:9090 com.unifieddto.api.user.UserService/GetUser
+```
+*Response:*
 ```json
 {
   "id": "456",
-  "username": "testuser",
-  "email": "testuser@example.com"
+  "username": "command-pattern-user",
+  "email": "command.user@example.com"
 }
 ```
 
-You have now successfully called two different services (REST and gRPC) that use the exact same DTO definition.
-
-### 4. Test the Messaging Endpoints
-
-The project is also configured to produce and consume messages using Kafka and RabbitMQ, using the same Protobuf `User` DTO.
-
-#### Prerequisites: Running Kafka and RabbitMQ
-
-You need running instances of Kafka and RabbitMQ. The easiest way to do this is with Docker.
-
-**RabbitMQ:**
+**3. Create User:**
 ```bash
-docker run -d --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+grpcurl -plaintext -d '{"username": "new-grpc-user", "email": "new-grpc@example.com"}' \
+localhost:9090 com.unifieddto.api.user.UserService/CreateUser
+```
+*Response (the user ID will be random):*
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+  "statusMessage": "User 'new-grpc-user' created successfully."
+}
 ```
 
-**Kafka (with Zookeeper):**
-```bash
-# Start Zookeeper
-docker run -d --name zookeeper -p 2181:2181 wurstmeister/zookeeper
+#### C) Verifying Messaging Consumption
 
-# Start Kafka
-docker run -d --name kafka -p 9092:9092 \
-  -e KAFKA_ADVERTISED_HOST_NAME=localhost \
-  -e KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 \
-  -e KAFKA_CREATE_TOPICS="users.topic:1:1" \
-  --link zookeeper \
-  wurstmeister/kafka
+If you run the "Create User" command via either the REST or gRPC endpoint, it will publish a `CreateUserRequest` message to both Kafka and RabbitMQ.
+
+**Prerequisites:** You need running instances of Kafka and RabbitMQ. You can use the Docker commands from the previous version of this README.
+
+**Check the Logs:**
+Look at the logs of the running `user-service`. You will see the output from the consumers, showing they received the command and passed it to the business service.
+
+*Example Log Output:*
 ```
-*Note: It might take a minute for the brokers to be fully available.*
+# From the REST call to /api/users/create
+... INFO c.u.u.s.UserBusinessService : Executing business logic for: CreateUserRequest with username new-rest-user
+... INFO c.u.u.m.KafkaUserProducer   : Producing Kafka message for CreateUserRequest: new-rest-user
+... INFO c.u.u.m.RabbitUserProducer  : Producing RabbitMQ message for CreateUserRequest: new-rest-user
 
-#### Triggering the Producers
-
-With the `user-service` still running, use `curl` to send a POST request to the `/api/users/publish` endpoint. This endpoint will take the User JSON, convert it to the Protobuf `User` object, and then send it to both Kafka and RabbitMQ.
-
-```bash
-curl -X POST http://localhost:8080/api/users/publish \
--H "Content-Type: application/json" \
--d '{"id": "789", "username": "event-user", "email": "event-user@example.com"}'
+# From the consumers processing the messages
+... INFO c.u.u.m.KafkaUserConsumer   : Consumed Kafka message for CreateUserRequest: new-rest-user
+... INFO c.u.u.s.UserBusinessService : Executing business logic for: CreateUserRequest with username new-rest-user
+... INFO c.u.u.m.RabbitUserConsumer  : Consumed RabbitMQ message for CreateUserRequest: new-rest-user
+... INFO c.u.u.s.UserBusinessService : Executing business logic for: CreateUserRequest with username new-rest-user
 ```
-
-You should get a response: `User published to Kafka and RabbitMQ: 789`
-
-#### Verifying Consumption
-
-Check the logs of the running `user-service` application. You will see output from both the Kafka and RabbitMQ consumers, confirming that they received the message and deserialized it back into the `User` object successfully.
-
-```
-# Example output for Kafka
-... INFO ... [o.s.k.l.KafkaMessageListenerContainer$ListenerConsumer] Consumed Kafka message -> User ID: 789, Username: event-user
-
-# Example output for RabbitMQ
-... INFO ... [o.s.a.r.l.SimpleMessageListenerContainer] Consumed RabbitMQ message -> User ID: 789, Username: event-user
-```
+Notice how the same business logic (`Executing business logic for: CreateUserRequest...`) is triggered by three different interface points: the initial REST call, the Kafka consumer, and the RabbitMQ consumer. This successfully demonstrates the desired architecture.

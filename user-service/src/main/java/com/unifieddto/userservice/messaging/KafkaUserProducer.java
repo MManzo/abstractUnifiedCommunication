@@ -1,6 +1,6 @@
 package com.unifieddto.userservice.messaging;
 
-import com.unifieddto.api.user.User;
+import com.unifieddto.api.user.CreateUserRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,10 +19,10 @@ public class KafkaUserProducer {
     @Value("${app.kafka.topic.users}")
     private String topic;
 
-    public void sendMessage(User user) {
-        log.info("Producing Kafka message for user: {}", user.getId());
-        // Serialize the Protobuf User object to a byte array
-        byte[] userBytes = user.toByteArray();
-        kafkaTemplate.send(topic, user.getId(), userBytes);
+    public void sendMessage(CreateUserRequest request) {
+        log.info("Producing Kafka message for CreateUserRequest: {}", request.getUsername());
+        // Serialize the Protobuf CreateUserRequest object to a byte array
+        byte[] requestBytes = request.toByteArray();
+        kafkaTemplate.send(topic, requestBytes);
     }
 }

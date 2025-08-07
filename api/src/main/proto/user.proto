@@ -18,8 +18,23 @@ message GetUserRequest {
   string id = 1;
 }
 
+// Command to create a new user
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+}
+
+// Response for creating a new user
+message CreateUserResponse {
+  string id = 1;
+  string status_message = 2;
+}
+
 // The gRPC service definition
 service UserService {
   // Retrieves a user by their ID
   rpc GetUser(GetUserRequest) returns (User) {}
+
+  // Creates a new user
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {}
 }

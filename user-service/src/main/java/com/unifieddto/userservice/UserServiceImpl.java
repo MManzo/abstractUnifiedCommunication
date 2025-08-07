@@ -1,8 +1,6 @@
 package com.unifieddto.userservice;
 
-import com.unifieddto.api.user.GetUserRequest;
-import com.unifieddto.api.user.User;
-import com.unifieddto.api.user.UserServiceGrpc;
+import com.unifieddto.api.user.*;
 import com.unifieddto.userservice.service.UserBusinessService;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
@@ -17,9 +15,16 @@ public class UserServiceImpl extends UserServiceGrpc.UserServiceImplBase {
     @Override
     public void getUser(GetUserRequest request, StreamObserver<User> responseObserver) {
         // Delegate the call to the business logic layer
-        User user = userBusinessService.getUserById(request.getId());
+        User response = userBusinessService.execute(request);
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 
-        responseObserver.onNext(user);
+    @Override
+    public void createUser(CreateUserRequest request, StreamObserver<CreateUserResponse> responseObserver) {
+        // Delegate the call to the business logic layer
+        CreateUserResponse response = userBusinessService.execute(request);
+        responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 }

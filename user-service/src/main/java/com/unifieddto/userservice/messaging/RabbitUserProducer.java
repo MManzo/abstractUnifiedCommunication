@@ -1,6 +1,6 @@
 package com.unifieddto.userservice.messaging;
 
-import com.unifieddto.api.user.User;
+import com.unifieddto.api.user.CreateUserRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -22,10 +22,10 @@ public class RabbitUserProducer {
     @Value("${app.rabbitmq.routingkey.users}")
     private String routingKey;
 
-    public void sendMessage(User user) {
-        log.info("Producing RabbitMQ message for user: {}", user.getId());
-        // Serialize the Protobuf User object to a byte array
-        byte[] userBytes = user.toByteArray();
-        rabbitTemplate.convertAndSend(exchange, routingKey, userBytes);
+    public void sendMessage(CreateUserRequest request) {
+        log.info("Producing RabbitMQ message for CreateUserRequest: {}", request.getUsername());
+        // Serialize the Protobuf CreateUserRequest object to a byte array
+        byte[] requestBytes = request.toByteArray();
+        rabbitTemplate.convertAndSend(exchange, routingKey, requestBytes);
     }
 }

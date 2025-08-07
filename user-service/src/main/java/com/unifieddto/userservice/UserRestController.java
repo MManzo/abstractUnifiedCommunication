@@ -1,11 +1,13 @@
 package com.unifieddto.userservice;
 
+import com.unifieddto.api.user.CreateUserRequest;
+import com.unifieddto.api.user.CreateUserResponse;
+import com.unifieddto.api.user.GetUserRequest;
 import com.unifieddto.api.user.User;
 import com.unifieddto.userservice.messaging.KafkaUserProducer;
 import com.unifieddto.userservice.messaging.RabbitUserProducer;
 import com.unifieddto.userservice.service.UserBusinessService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -13,30 +15,31 @@ import org.springframework.web.bind.annotation.*;
 public class UserRestController {
 
     @Autowired
+    private UserBusinessService userBusinessService;
+
+    @Autowired
     private KafkaUserProducer kafkaUserProducer;
 
     @Autowired
     private RabbitUserProducer rabbitUserProducer;
 
-    @Autowired
-    private UserBusinessService userBusinessService;
 
-    @GetMapping("/{id}")
-    public User getUserById(@PathVariable String id) {
+    @PostMapping("/get")
+    public User getUser(@RequestBody GetUserRequest request) {
         // Delegate the call to the business logic layer
-        return userBusinessService.getUserById(id);
+        return userBusinessService.execute(request);
     }
 
-    @PostMapping("/publish")
-    public ResponseEntity<String> publishUser(@RequestBody User user) {
-        // This endpoint demonstrates using the same User DTO from a REST request
-        // to produce messages to Kafka and RabbitMQ.
+    @PostMapping("/create")
+    public CreateUserResponse createUser(@RequestBody CreateUserRequest request) {
+        // This endpoint demonstrates a command-based approach.
+        // 1. Execute the business logic command
+        CreateUserResponse response = userBusinessService.execute(request);
 
-        // Spring's ProtobufHttpMessageConverter deserializes the incoming JSON to a User object.
-        // We then pass this same object to our producers.
-        kafkaUserProducer.sendMessage(user);
-        rabbitUserProducer.sendMessage(user);
+        // 2. Publish the command to message queues for other services to consume
+        kafkaUserProducer.sendMessage(request);
+        rabbitUserProducer.sendMessage(request);
 
-        return ResponseEntity.ok("User published to Kafka and RabbitMQ: " + user.getId());
+        return response;
     }
 }
