@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package com.unifieddto.api;
+
+option java_multiple_files = true;
+option java_package = "com.unifieddto.api.user";
+option java_outer_classname = "UserProto";
+
+// The User DTO
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+}
+
+// Request to get a user by ID
+message GetUserRequest {
+  string id = 1;
+}
+
+// The gRPC service definition
+service UserService {
+  // Retrieves a user by their ID
+  rpc GetUser(GetUserRequest) returns (User) {}
+}

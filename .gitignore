@@ -1,0 +1,19 @@
+# Maven
+target/
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
