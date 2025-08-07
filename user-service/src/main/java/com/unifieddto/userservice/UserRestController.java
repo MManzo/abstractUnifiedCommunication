@@ -3,6 +3,7 @@ package com.unifieddto.userservice;
 import com.unifieddto.api.user.User;
 import com.unifieddto.userservice.messaging.KafkaUserProducer;
 import com.unifieddto.userservice.messaging.RabbitUserProducer;
+import com.unifieddto.userservice.service.UserBusinessService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,15 +18,13 @@ public class UserRestController {
     @Autowired
     private RabbitUserProducer rabbitUserProducer;
 
+    @Autowired
+    private UserBusinessService userBusinessService;
+
     @GetMapping("/{id}")
     public User getUserById(@PathVariable String id) {
-        // In a real application, you would fetch the user from a service layer.
-        // For this example, we'll return a hardcoded user, similar to the gRPC service.
-        return User.newBuilder()
-                .setId(id)
-                .setUsername("testuser-rest")
-                .setEmail("testuser-rest@example.com")
-                .build();
+        // Delegate the call to the business logic layer
+        return userBusinessService.getUserById(id);
     }
 
     @PostMapping("/publish")

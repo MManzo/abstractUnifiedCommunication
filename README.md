@@ -6,11 +6,28 @@ The core principle is to use **Protocol Buffers (Protobuf)** as the Interface De
 
 ## Architecture
 
-The project is structured as a multi-module Maven project:
+The project is structured as a multi-module Maven project and follows a clean, layered architecture within the `user-service`.
+
+### Project Modules
 
 -   `unified-dto-parent`: The parent POM that manages common dependencies and build configurations.
 -   `api`: This is the **contract module**. It contains only `.proto` files that define our DTOs (as `message`s) and gRPC services. The `protobuf-maven-plugin` is configured here to generate Java classes from the `.proto` files.
 -   `user-service`: A Spring Boot microservice that **consumes** the `api` module as a dependency. It exposes both a gRPC endpoint and a RESTful endpoint, both of which use the same DTO classes generated from the `api` module.
+
+### Layered Architecture in `user-service`
+
+To ensure a clean separation of concerns, the `user-service` is structured into layers:
+
+1.  **Interface Layer**: These are the components that handle communication with the outside world. They are responsible for protocol-specific tasks (like handling HTTP requests, gRPC calls, or consuming messages) and translating them into calls to the business logic layer.
+    -   `UserRestController` (REST)
+    -   `UserServiceImpl` (gRPC)
+    -   `KafkaUserConsumer` (Kafka)
+    -   `RabbitUserConsumer` (RabbitMQ)
+
+2.  **Business Logic Layer**: This is the core of the service, where the actual business rules and operations reside. It is completely decoupled from the communication style.
+    -   `UserBusinessService`: A single, centralized service that contains the core logic. All components in the interface layer delegate their calls to this service.
+
+This design ensures that the business logic is written only once and can be reused by any number of interfaces.
 
 ## How it Works
 
