@@ -18,30 +18,37 @@ The project is structured as a multi-module Maven project and follows a clean, l
 
 To ensure a clean separation of concerns, the `user-service` is structured into layers:
 
-1.  **Interface Layer**: These are the components that handle communication with the outside world. They are responsible for protocol-specific tasks (like handling HTTP requests, gRPC calls, or consuming messages) and translating them into calls to the business logic layer.
-    -   `UserRestController` (REST)
-    -   `UserServiceImpl` (gRPC)
-    -   `KafkaUserConsumer` (Kafka)
-    -   `RabbitUserConsumer` (RabbitMQ)
+1.  **Dynamic Interface Layer**: This layer is responsible for handling communication with the outside world. It consists of generic, reusable "registrar" components that dynamically create endpoints based on configuration. This avoids writing boilerplate controller and consumer classes for each business action.
+    -   `DynamicRestControllerRegistrar`: Creates REST endpoints.
+    -   `DynamicRabbitListenerRegistrar`: Creates RabbitMQ listeners.
+    -   `UserServiceImpl` (gRPC): gRPC remains explicit due to its contract-first nature.
+    -   `KafkaUserConsumer` (Kafka): The Kafka consumer remains explicit for this demo, but could be made dynamic using the same pattern as RabbitMQ.
 
-2.  **Business Logic Layer**: This is the core of the service, where the actual business rules and operations reside. It is completely decoupled from the communication style.
-    -   `UserBusinessService`: A single, centralized service that contains the core logic. All components in the interface layer delegate their calls to this service.
+2.  **Business Logic Layer**: This is the core of the service.
+    -   `UserBusinessService`: A single, centralized service that contains the core logic, with overloaded `execute` methods for different commands.
 
-This design ensures that the business logic is written only once and can be reused by any number of interfaces.
+This design provides a powerful, configuration-driven approach to exposing business logic, drastically reducing boilerplate code.
 
-## How it Works
+## How it Works: The Dynamic Framework
 
-1.  **DTO Definition**: The `User` DTO is defined once in `api/src/main/proto/user.proto`.
-2.  **Code Generation**: When you build the project with Maven, the `protobuf-maven-plugin` compiles `user.proto` into Java classes (e.g., `User`, `GetUserRequest`, `UserServiceGrpc`) and packages them into a JAR file for the `api` module.
-3.  **gRPC Implementation**: The `UserServiceImpl` in the `user-service` module directly implements the generated `UserServiceGrpc.UserServiceImplBase`, using the `User` and `GetUserRequest` classes natively.
-4.  **REST Implementation**: The `UserRestController` uses the exact same `User` class as a return type for its endpoints. Spring Boot, thanks to the `com.google.protobuf:protobuf-java-util` dependency, automatically configures a `ProtobufHttpMessageConverter` that serializes the `User` object into JSON for the HTTP response.
-5.  **Messaging (Kafka/RabbitMQ)**: Although not fully implemented, the same `User` object can be easily used for messaging. You would serialize it to a byte array for production (`user.toByteArray()`) and deserialize it from a byte array upon consumption (`User.parseFrom(byteArray)`). This is far more efficient than JSON-based serialization.
+The key to this architecture is the dynamic registration of endpoints at application startup.
+
+1.  **Configuration as Blueprint**: The `application.properties` file now defines the API surface. It contains sections for `app.rabbitmq.bindings.*` and `app.rest.endpoints.*` that map queues and HTTP paths to specific business services and DTOs.
+2.  **Registrars as Engines**: At startup, the `DynamicRabbitListenerRegistrar` and `DynamicRestControllerRegistrar` read this configuration.
+3.  **Programmatic Registration**:
+    -   The RabbitMQ registrar programmatically creates and registers a `MessageListenerContainer` for each binding, wiring it to a generic handler.
+    -   The REST registrar programmatically registers a handler method with Spring's `RequestMappingHandlerMapping` for each endpoint.
+4.  **Generic Handlers**: These handlers contain the reusable logic.
+    -   The RabbitMQ handler deserializes the message to the configured DTO type and calls the business service.
+    -   The REST handler is more complex, dynamically populating the DTO from path variables, query parameters, headers, and the request body based on the configuration before calling the business service.
+
+This creates a system where new business logic can be exposed over REST and RabbitMQ simply by adding configuration entries, without writing any new controller or consumer Java code.
 
 ## How to Run
 
 ### 1. Build the Project
 
-First, build the entire project from the root directory. This will compile the `.proto` files and install the artifacts into your local Maven repository.
+First, build the entire project. This is unchanged.
 
 ```bash
 mvn clean install
@@ -62,105 +69,78 @@ The service will start up.
 
 ### 3. Test the Endpoints
 
-You can now test the various endpoints, which all trigger the same underlying business logic.
+You can now test the dynamically and explicitly configured endpoints.
 
-#### A) Testing the REST Interface
+#### A) Testing the Dynamic REST Interface
 
-Open a new terminal.
+The following endpoints are created dynamically from `application.properties`.
 
-**1. Get User:**
-Send a `POST` request with a `GetUserRequest` body.
+**1. Get User (dynamic):**
+This endpoint demonstrates mapping a path variable to a DTO field.
 ```bash
-curl -X POST http://localhost:8080/api/users/get \
--H "Content-Type: application/json" \
--d '{"id": "123"}'
+curl http://localhost:8080/api/v2/users/789
 ```
 *Response:*
 ```json
 {
-  "id": "123",
+  "id": "789",
   "username": "command-pattern-user",
   "email": "command.user@example.com"
 }
 ```
 
-**2. Create User (and trigger messaging):**
-Send a `POST` request with a `CreateUserRequest` body. This endpoint will also trigger the Kafka and RabbitMQ producers.
+**2. Create User (dynamic):**
+This endpoint takes the DTO from the request body. Note that this call will also trigger the RabbitMQ and Kafka producers.
 ```bash
-curl -X POST http://localhost:8080/api/users/create \
+curl -X POST http://localhost:8080/api/v2/users \
 -H "Content-Type: application/json" \
--d '{"username": "new-rest-user", "email": "new-rest@example.com"}'
+-d '{"username": "new-dynamic-rest-user", "email": "dynamic@example.com"}'
 ```
-*Response (the user ID will be random):*
+*Response (ID is random):*
 ```json
 {
-  "id": "c7a8f2e9-a3b4-4c1d-8e6f-ac72a8d3e5d7",
-  "statusMessage": "User 'new-rest-user' created successfully."
+  "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+  "statusMessage": "User 'new-dynamic-rest-user' created successfully."
 }
 ```
 
-#### B) Testing the gRPC Interface
+#### B) Testing the gRPC Interface (Explicit)
 
-You can use a tool like `grpcurl`.
+The gRPC interface remains explicitly defined for type safety and clarity. The commands are unchanged.
 
-**1. List Methods:**
-The `UserService` now exposes two methods.
-```bash
-grpcurl -plaintext localhost:9090 list com.unifieddto.api.user.UserService
-```
-*Response:*
-```
-com.unifieddto.api.user.UserService.CreateUser
-com.unifieddto.api.user.UserService.GetUser
-```
-
-**2. Get User:**
+**1. Get User:**
 ```bash
 grpcurl -plaintext -d '{"id": "456"}' \
 localhost:9090 com.unifieddto.api.user.UserService/GetUser
 ```
-*Response:*
-```json
-{
-  "id": "456",
-  "username": "command-pattern-user",
-  "email": "command.user@example.com"
-}
-```
 
-**3. Create User:**
+**2. Create User:**
 ```bash
 grpcurl -plaintext -d '{"username": "new-grpc-user", "email": "new-grpc@example.com"}' \
 localhost:9090 com.unifieddto.api.user.UserService/CreateUser
 ```
-*Response (the user ID will be random):*
-```json
-{
-  "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-  "statusMessage": "User 'new-grpc-user' created successfully."
-}
-```
 
 #### C) Verifying Messaging Consumption
 
-If you run the "Create User" command via either the REST or gRPC endpoint, it will publish a `CreateUserRequest` message to both Kafka and RabbitMQ.
+**Prerequisites:** You need running instances of Kafka and RabbitMQ.
 
-**Prerequisites:** You need running instances of Kafka and RabbitMQ. You can use the Docker commands from the previous version of this README.
+**1. Trigger a Message:**
+Call the "Create User" REST or gRPC endpoint. This will publish a `CreateUserRequest` message to both Kafka and RabbitMQ.
 
-**Check the Logs:**
-Look at the logs of the running `user-service`. You will see the output from the consumers, showing they received the command and passed it to the business service.
+**2. Check the Logs:**
+Look at the logs of the running `user-service`. You will see output from both the dynamic RabbitMQ consumer and the explicit Kafka consumer.
 
 *Example Log Output:*
 ```
-# From the REST call to /api/users/create
-... INFO c.u.u.s.UserBusinessService : Executing business logic for: CreateUserRequest with username new-rest-user
-... INFO c.u.u.m.KafkaUserProducer   : Producing Kafka message for CreateUserRequest: new-rest-user
-... INFO c.u.u.m.RabbitUserProducer  : Producing RabbitMQ message for CreateUserRequest: new-rest-user
+# From the REST call to /api/v2/users
+... INFO c.u.u.s.UserBusinessService      : Executing business logic for: CreateUserRequest with username new-dynamic-rest-user
+... INFO c.u.u.m.KafkaUserProducer        : Producing Kafka message for CreateUserRequest: new-dynamic-rest-user
+... INFO c.u.u.m.RabbitUserProducer       : Producing RabbitMQ message for CreateUserRequest: new-dynamic-rest-user
 
 # From the consumers processing the messages
-... INFO c.u.u.m.KafkaUserConsumer   : Consumed Kafka message for CreateUserRequest: new-rest-user
-... INFO c.u.u.s.UserBusinessService : Executing business logic for: CreateUserRequest with username new-rest-user
-... INFO c.u.u.m.RabbitUserConsumer  : Consumed RabbitMQ message for CreateUserRequest: new-rest-user
-... INFO c.u.u.s.UserBusinessService : Executing business logic for: CreateUserRequest with username new-rest-user
+... INFO c.u.u.m.KafkaUserConsumer        : Consumed Kafka message for CreateUserRequest: new-dynamic-rest-user
+... INFO c.u.u.s.UserBusinessService      : Executing business logic for: CreateUserRequest with username new-dynamic-rest-user
+... INFO m.d.GenericMessageHandler        : Generic handler received message of type CreateUserRequest, invoking UserBusinessService.execute()
+... INFO c.u.u.s.UserBusinessService      : Executing business logic for: CreateUserRequest with username new-dynamic-rest-user
 ```
-Notice how the same business logic (`Executing business logic for: CreateUserRequest...`) is triggered by three different interface points: the initial REST call, the Kafka consumer, and the RabbitMQ consumer. This successfully demonstrates the desired architecture.
+Notice how the `GenericMessageHandler` now handles the RabbitMQ message, while the explicit `KafkaUserConsumer` handles the other. Both ultimately call the same business logic, successfully demonstrating the power and flexibility of the new architecture.
