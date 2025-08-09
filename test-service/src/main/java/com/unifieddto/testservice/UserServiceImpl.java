@@ -1,7 +1,7 @@
-package com.unifieddto.userservice;
+package com.unifieddto.testservice;
 
 import com.unifieddto.api.user.*;
-import com.unifieddto.userservice.service.UserBusinessService;
+import com.unifieddto.testservice.service.UserBusinessService;
 import io.grpc.stub.StreamObserver;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.springframework.beans.factory.annotation.Autowired;

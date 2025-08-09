@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package com.unifieddto.api;
+
+option java_multiple_files = true;
+option java_package = "com.unifieddto.api.user";
+option java_outer_classname = "UserProto";
+
+// The User DTO
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+}
+
+// Request to get a user by ID
+message GetUserRequest {
+  string id = 1;
+}
+
+// Command to create a new user
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+}
+
+// Response for creating a new user
+message CreateUserResponse {
+  string id = 1;
+  string status_message = 2;
+}
+
+// Command to update a user
+message UpdateUserRequest {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+}
+
+// Response for updating a user
+message UpdateUserResponse {
+  string id = 1;
+  string status_message = 2;
+}
+
+// Command to delete a user
+message DeleteUserRequest {
+  string id = 1;
+}
+
+// Response for deleting a user
+message DeleteUserResponse {
+  string id = 1;
+  string status_message = 2;
+}
+
+// Command to search for users
+message SearchUsersRequest {
+  string email_query = 1; // Example: search by email
+}
+
+// Response for searching users
+message SearchUsersResponse {
+  repeated User users = 1;
+}
+
+
+// The gRPC service definition
+service UserService {
+  // Retrieves a user by their ID
+  rpc GetUser(GetUserRequest) returns (User) {}
+
+  // Creates a new user
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {}
+
+  // Updates an existing user
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
+
+  // Deletes a user
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {}
+
+  // Searches for users
+  rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse) {}
+}

@@ -89,16 +89,23 @@ public class DynamicRabbitListenerRegistrar implements InitializingBean {
             this.dtoParser = (Parser<?>) parserMethod.invoke(null);
         }
 
-        // This is the method the MessageListenerAdapter will call
-        public void handleMessage(byte[] messageBody) {
+        // This is the method the MessageListenerAdapter will call.
+        // By returning a byte array, we enable Spring's automatic RPC handling.
+        public byte[] handleMessage(byte[] messageBody) {
             try {
                 Message requestDto = (Message) dtoParser.parseFrom(messageBody);
                 log.info("Generic handler received message of type {}, invoking {}.execute()",
                         requestDto.getClass().getSimpleName(), serviceBean.getClass().getSimpleName());
-                executeMethod.invoke(serviceBean, requestDto);
+
+                Object result = executeMethod.invoke(serviceBean, requestDto);
+
+                if (result instanceof Message) {
+                    return ((Message) result).toByteArray();
+                }
             } catch (Exception e) {
                 log.error("Error in generic message handler", e);
             }
+            return null; // Return null if there's an error or no response
         }
     }
 }

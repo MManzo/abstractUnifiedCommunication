@@ -9,17 +9,10 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>user-service</artifactId>
+    <artifactId>dynamic-framework</artifactId>
     <packaging>jar</packaging>
 
     <dependencies>
-        <!-- Internal API module -->
-        <dependency>
-            <groupId>com.unified-dto</groupId>
-            <artifactId>api</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

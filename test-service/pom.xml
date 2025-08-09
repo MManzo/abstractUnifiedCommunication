@@ -14,17 +14,30 @@
     <packaging>jar</packaging>
 
     <dependencies>
-        <!-- The API module with the Protobuf DTOs -->
+        <!-- Protobuf and gRPC libraries -->
         <dependency>
-            <groupId>com.unified-dto</groupId>
-            <artifactId>api</artifactId>
-            <version>${project.version}</version>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-protobuf</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-stub</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.3.2</version>
+            <scope>provided</scope>
         </dependency>
 
         <!-- The "framework" module containing the dynamic registrars -->
         <dependency>
             <groupId>com.unified-dto</groupId>
-            <artifactId>user-service</artifactId>
+            <artifactId>dynamic-framework</artifactId>
             <version>${project.version}</version>
         </dependency>
 
@@ -36,7 +49,18 @@
     </dependencies>
 
     <build>
+        <extensions>
+            <extension>
+                <groupId>kr.motd.maven</groupId>
+                <artifactId>os-maven-plugin</artifactId>
+                <version>${os-maven-plugin.version}</version>
+            </extension>
+        </extensions>
         <plugins>
+            <plugin>
+                <groupId>org.xolstice.maven.plugins</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

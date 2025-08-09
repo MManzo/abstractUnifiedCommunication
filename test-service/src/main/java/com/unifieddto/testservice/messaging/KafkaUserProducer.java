@@ -1,4 +1,4 @@
-package com.unifieddto.userservice.messaging;
+package com.unifieddto.testservice.messaging;
 
 import com.unifieddto.api.user.CreateUserRequest;
 import org.slf4j.Logger;

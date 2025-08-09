@@ -1,8 +1,8 @@
-package com.unifieddto.userservice.messaging;
+package com.unifieddto.testservice.messaging;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.unifieddto.api.user.CreateUserRequest;
-import com.unifieddto.userservice.service.UserBusinessService;
+import com.unifieddto.testservice.service.UserBusinessService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
