@@ -144,3 +144,44 @@ Look at the logs of the running `user-service`. You will see output from both th
 ... INFO c.u.u.s.UserBusinessService      : Executing business logic for: CreateUserRequest with username new-dynamic-rest-user
 ```
 Notice how the `GenericMessageHandler` now handles the RabbitMQ message, while the explicit `KafkaUserConsumer` handles the other. Both ultimately call the same business logic, successfully demonstrating the power and flexibility of the new architecture.
+
+---
+
+## Part 2: Demonstrating the Framework with `test-service`
+
+The `test-service` module exists to prove the reusability of the dynamic framework components built in the `user-service`. It contains its own business logic (`OrderBusinessService`) but **no controllers or consumers**. It relies entirely on the framework and its own `application.properties` to expose its logic.
+
+### 1. Run the `test-service`
+
+Navigate to the `test-service` directory and run the Spring Boot application.
+
+```bash
+cd test-service
+mvn spring-boot:run
+```
+The service will start on port `8081`.
+
+### 2. Test the Dynamically Created Endpoints
+
+**A) Test the REST Endpoint for Orders**
+
+The framework has created a `POST /api/v2/orders` endpoint based on the `test-service`'s properties file.
+
+```bash
+curl -X POST http://localhost:8081/api/v2/orders \
+-H "Content-Type: application/json" \
+-d '{"productId": "PROD-456", "quantity": 10, "customerId": "CUST-789"}'
+```
+*Response (orderId is random):*
+```json
+{
+  "orderId": "ORD-a1b2c3d4-e5f6-7890-1234-567890abcdef",
+  "statusMessage": "Order for product PROD-456 has been accepted."
+}
+```
+
+**B) Test the RabbitMQ Listener for Orders**
+
+To test the dynamically created RabbitMQ listener, you would need a simple producer client to send a `CreateOrderRequest` message to the `order.commands.create` queue. Upon receiving the message, the `test-service` logs will show the `OrderBusinessService` logic being executed, proving the dynamic listener is working.
+
+This successfully demonstrates that the framework is truly generic. We can expose new business logic over multiple protocols without writing any new interface-layer Java code.

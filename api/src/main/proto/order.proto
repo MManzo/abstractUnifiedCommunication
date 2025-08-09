@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package com.unifieddto.api;
+
+option java_multiple_files = true;
+option java_package = "com.unifieddto.api.order";
+option java_outer_classname = "OrderProto";
+
+// Command to create a new order
+message CreateOrderRequest {
+  string product_id = 1;
+  int32 quantity = 2;
+  string customer_id = 3;
+}
+
+// Response for creating a new order
+message CreateOrderResponse {
+  string order_id = 1;
+  string status_message = 2;
+}

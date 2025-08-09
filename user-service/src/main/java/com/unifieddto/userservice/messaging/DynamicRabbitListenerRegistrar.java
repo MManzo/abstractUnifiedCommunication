@@ -6,7 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
-import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
+import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.adapter.MessageListenerAdapter;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.context.ApplicationContext;
@@ -62,7 +62,7 @@ public class DynamicRabbitListenerRegistrar implements InitializingBean {
         GenericMessageHandler handler = new GenericMessageHandler(serviceBean, dtoClass);
 
         // 4. Create and configure the listener container
-        MessageListenerContainer container = containerFactory.createListenerContainer();
+        SimpleMessageListenerContainer container = containerFactory.createListenerContainer();
         container.setQueueNames(props.getQueueName());
         container.setMessageListener(new MessageListenerAdapter(handler, "handleMessage"));
 
