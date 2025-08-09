@@ -1,4 +1,4 @@
-package com.unifieddto.userservice.messaging;
+package com.unifieddto.framework.messaging;
 
 import com.google.protobuf.Message;
 import com.google.protobuf.Parser;

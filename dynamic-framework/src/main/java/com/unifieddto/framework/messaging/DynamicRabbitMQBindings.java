@@ -1,4 +1,4 @@
-package com.unifieddto.userservice.messaging;
+package com.unifieddto.framework.messaging;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

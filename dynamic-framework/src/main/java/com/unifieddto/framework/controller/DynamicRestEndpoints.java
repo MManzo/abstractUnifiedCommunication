@@ -1,4 +1,4 @@
-package com.unifieddto.userservice.controller;
+package com.unifieddto.framework.controller;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
