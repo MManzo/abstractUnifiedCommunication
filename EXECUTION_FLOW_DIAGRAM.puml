@@ -1,0 +1,108 @@
+@startuml Hexagonal Architecture - Execution Flow
+
+!define FRAMEWORK_COLOR #E8F4FD
+!define TEST_PROJECT_COLOR #FFF2CC
+!define PROTOBUF_COLOR #F8CECC
+!define EXTERNAL_COLOR #FFE6CC
+
+title Hexagonal Architecture - Multi-Protocol Execution Flow
+
+actor "REST Client" as RestClient EXTERNAL_COLOR
+actor "RabbitMQ Producer" as RabbitProducer EXTERNAL_COLOR
+actor "Direct Caller" as DirectCaller EXTERNAL_COLOR
+
+package "Framework - Primary Adapters" FRAMEWORK_COLOR {
+    participant "REST Controller\n(Auto-generated)" as RestController FRAMEWORK_COLOR
+    participant "RabbitMQ Listener\n(Auto-generated)" as RabbitListener FRAMEWORK_COLOR
+    participant "UseCaseExecutor" as Executor FRAMEWORK_COLOR
+    participant "UseCaseRegistry" as Registry FRAMEWORK_COLOR
+    participant "InputValidator" as Validator FRAMEWORK_COLOR
+}
+
+package "Test Project - Business Logic" TEST_PROJECT_COLOR {
+    participant "CreateUserUseCase" as UseCase TEST_PROJECT_COLOR
+}
+
+package "Test Project - Secondary Adapters" TEST_PROJECT_COLOR {
+    participant "InMemoryUserRepository" as Repository TEST_PROJECT_COLOR
+    participant "RabbitMQEventPublisher" as EventPublisher TEST_PROJECT_COLOR
+}
+
+database "In-Memory Storage" as Storage EXTERNAL_COLOR
+queue "Event Queue" as EventQueue EXTERNAL_COLOR
+
+== REST Flow ==
+RestClient -> RestController : POST /users\n{username, email}
+RestController -> Executor : execute("create-user", request)
+Executor -> Registry : getUseCase("create-user")
+Registry --> Executor : CreateUserUseCase
+Executor -> Validator : validate(request)
+Validator --> Executor : ✓ valid
+Executor -> UseCase : execute(CreateUserRequest)
+
+UseCase -> Repository : existsByUsername(username)
+Repository -> Storage : check username
+Storage --> Repository : false
+Repository --> UseCase : false
+
+UseCase -> Repository : save(id, username, email)
+Repository -> Storage : store user
+Storage --> Repository : ✓ saved
+
+UseCase -> EventPublisher : publishUserCreated(id, username, email)
+EventPublisher -> EventQueue : publish event
+EventQueue --> EventPublisher : ✓ published
+
+UseCase --> Executor : CreateUserResponse
+Executor --> RestController : CreateUserResponse
+RestController --> RestClient : HTTP 200\n{id, statusMessage}
+
+== RabbitMQ Flow ==
+RabbitProducer -> RabbitListener : message on "user.create" queue\n{username, email}
+RabbitListener -> Executor : execute("create-user", request)
+note right : Same execution path as REST
+Executor -> Registry : getUseCase("create-user")
+Registry --> Executor : CreateUserUseCase
+Executor -> Validator : validate(request)
+Validator --> Executor : ✓ valid
+Executor -> UseCase : execute(CreateUserRequest)
+
+UseCase -> Repository : existsByUsername(username)
+Repository --> UseCase : false
+UseCase -> Repository : save(id, username, email)
+UseCase -> EventPublisher : publishUserCreated(id, username, email)
+UseCase --> Executor : CreateUserResponse
+Executor --> RabbitListener : CreateUserResponse
+RabbitListener --> RabbitProducer : ✓ processed
+
+== Direct Call Flow (Testing) ==
+DirectCaller -> UseCase : execute(CreateUserRequest)
+note right : Direct call bypasses framework\nfor pure unit testing
+UseCase -> Repository : existsByUsername(username)
+Repository --> UseCase : false
+UseCase -> Repository : save(id, username, email)
+UseCase -> EventPublisher : publishUserCreated(id, username, email)
+UseCase --> DirectCaller : CreateUserResponse
+
+note over RestController, RabbitListener
+**Key Insight:**
+Same business logic (CreateUserUseCase)
+executed identically across all protocols
+end note
+
+note over UseCase
+**Business Logic:**
+• Protocol agnostic
+• Pure domain logic
+• Easy to test
+• Single source of truth
+end note
+
+note over Repository, EventPublisher
+**Secondary Adapters:**
+• Implement infrastructure concerns
+• Swappable implementations
+• Testable with mocks
+end note
+
+@enduml

@@ -1,0 +1,222 @@
+@startuml Hexagonal Architecture - Class Diagram
+
+!define FRAMEWORK_COLOR #E8F4FD
+!define TEST_PROJECT_COLOR #FFF2CC
+!define PROTOBUF_COLOR #F8CECC
+!define INTERFACE_COLOR #D5E8D4
+
+title Hexagonal Architecture - Unified Communication Framework
+
+package "Framework Core" <<Rectangle>> {
+    
+    package "Domain Layer" FRAMEWORK_COLOR {
+        interface UseCase<REQUEST, RESPONSE> INTERFACE_COLOR {
+            +execute(request: REQUEST): RESPONSE
+        }
+        
+        class BusinessException FRAMEWORK_COLOR {
+            -code: String
+            -message: String
+            +BusinessException(code, message)
+        }
+        
+        class ValidationException FRAMEWORK_COLOR {
+            -field: String
+            -message: String
+            +ValidationException(field, message)
+        }
+    }
+    
+    package "Ports (Secondary)" FRAMEWORK_COLOR {
+        interface InputValidator<T> INTERFACE_COLOR {
+            +validate(input: T): void
+        }
+    }
+    
+    package "Adapters (Primary)" FRAMEWORK_COLOR {
+        class UseCaseExecutor FRAMEWORK_COLOR {
+            -useCaseRegistry: UseCaseRegistry
+            -inputValidator: InputValidator
+            +execute(useCaseName: String, request: Object): Object
+        }
+        
+        class UseCaseRegistry FRAMEWORK_COLOR {
+            -useCases: Map<String, UseCase>
+            +registerUseCase(name: String, useCase: UseCase): void
+            +getUseCase(name: String): UseCase
+            +discoverUseCases(): void
+        }
+        
+        class HexagonalRestControllerRegistrar FRAMEWORK_COLOR {
+            -useCaseExecutor: UseCaseExecutor
+            -dynamicEndpointConfig: DynamicEndpointConfig
+            +registerRestEndpoints(): void
+        }
+        
+        class HexagonalRabbitListenerRegistrar FRAMEWORK_COLOR {
+            -useCaseExecutor: UseCaseExecutor
+            -dynamicRabbitConfig: DynamicRabbitConfig
+            +registerRabbitListeners(): void
+        }
+        
+        class ProtobufInputValidator FRAMEWORK_COLOR {
+            +validate(input: MessageLite): void
+        }
+    }
+    
+    package "Configuration" FRAMEWORK_COLOR {
+        class HexagonalArchitectureConfiguration FRAMEWORK_COLOR {
+            +useCaseExecutor(): UseCaseExecutor
+            +useCaseRegistry(): UseCaseRegistry
+            +protobufInputValidator(): ProtobufInputValidator
+        }
+    }
+}
+
+package "Test Project Implementation" <<Rectangle>> {
+    
+    package "Use Cases (Application Layer)" TEST_PROJECT_COLOR {
+        class CreateUserUseCase TEST_PROJECT_COLOR {
+            -userRepository: UserRepository
+            -eventPublisher: EventPublisher
+            +execute(request: CreateUserRequest): CreateUserResponse
+        }
+        
+        class GetUserUseCase TEST_PROJECT_COLOR {
+            -userRepository: UserRepository
+            +execute(request: GetUserRequest): User
+        }
+    }
+    
+    package "Ports (Secondary)" TEST_PROJECT_COLOR {
+        interface UserRepository INTERFACE_COLOR {
+            +save(id: String, username: String, email: String): void
+            +findById(id: String): Optional<User>
+            +existsByUsername(username: String): boolean
+            +existsByEmail(email: String): boolean
+        }
+        
+        interface EventPublisher INTERFACE_COLOR {
+            +publishUserCreated(userId: String, username: String, email: String): void
+        }
+    }
+    
+    package "Adapters (Secondary)" TEST_PROJECT_COLOR {
+        class InMemoryUserRepository TEST_PROJECT_COLOR {
+            -users: Map<String, User>
+            +save(id: String, username: String, email: String): void
+            +findById(id: String): Optional<User>
+            +existsByUsername(username: String): boolean
+            +existsByEmail(email: String): boolean
+        }
+        
+        class RabbitMQEventPublisher TEST_PROJECT_COLOR {
+            -rabbitTemplate: RabbitTemplate
+            +publishUserCreated(userId: String, username: String, email: String): void
+        }
+    }
+    
+    package "Configuration" TEST_PROJECT_COLOR {
+        class HexagonalTestServiceConfiguration TEST_PROJECT_COLOR {
+            +createUserUseCase(): CreateUserUseCase
+            +getUserUseCase(): GetUserUseCase
+            +inMemoryUserRepository(): InMemoryUserRepository
+            +rabbitMQEventPublisher(): RabbitMQEventPublisher
+        }
+    }
+}
+
+package "Generated Protobuf Classes" <<Rectangle>> {
+    package "API DTOs" PROTOBUF_COLOR {
+        class CreateUserRequest PROTOBUF_COLOR {
+            -username: String
+            -email: String
+            +newBuilder(): Builder
+            +getUsername(): String
+            +getEmail(): String
+        }
+        
+        class CreateUserResponse PROTOBUF_COLOR {
+            -id: String
+            -statusMessage: String
+            +newBuilder(): Builder
+            +getId(): String
+            +getStatusMessage(): String
+        }
+        
+        class GetUserRequest PROTOBUF_COLOR {
+            -id: String
+            +newBuilder(): Builder
+            +getId(): String
+        }
+        
+        class User PROTOBUF_COLOR {
+            -id: String
+            -username: String
+            -email: String
+            +newBuilder(): Builder
+            +getId(): String
+            +getUsername(): String
+            +getEmail(): String
+        }
+    }
+}
+
+' Framework relationships
+UseCase ||--|| UseCaseRegistry : registered in
+UseCaseExecutor ||--|| UseCaseRegistry : uses
+UseCaseExecutor ||--|| InputValidator : validates with
+HexagonalRestControllerRegistrar ||--|| UseCaseExecutor : delegates to
+HexagonalRabbitListenerRegistrar ||--|| UseCaseExecutor : delegates to
+ProtobufInputValidator ..|> InputValidator : implements
+
+' Test project relationships
+CreateUserUseCase ..|> UseCase : implements
+GetUserUseCase ..|> UseCase : implements
+CreateUserUseCase ||--|| UserRepository : uses
+CreateUserUseCase ||--|| EventPublisher : uses
+GetUserUseCase ||--|| UserRepository : uses
+InMemoryUserRepository ..|> UserRepository : implements
+RabbitMQEventPublisher ..|> EventPublisher : implements
+
+' DTO relationships
+CreateUserUseCase ..> CreateUserRequest : uses
+CreateUserUseCase ..> CreateUserResponse : returns
+GetUserUseCase ..> GetUserRequest : uses
+GetUserUseCase ..> User : returns
+
+' Configuration relationships
+HexagonalArchitectureConfiguration ..> UseCaseExecutor : creates
+HexagonalArchitectureConfiguration ..> UseCaseRegistry : creates
+HexagonalArchitectureConfiguration ..> ProtobufInputValidator : creates
+HexagonalTestServiceConfiguration ..> CreateUserUseCase : creates
+HexagonalTestServiceConfiguration ..> GetUserUseCase : creates
+HexagonalTestServiceConfiguration ..> InMemoryUserRepository : creates
+HexagonalTestServiceConfiguration ..> RabbitMQEventPublisher : creates
+
+note top of UseCase : Primary Port\n(What the application can do)
+note top of UserRepository : Secondary Port\n(What the application needs)
+note top of EventPublisher : Secondary Port\n(What the application needs)
+note top of HexagonalRestControllerRegistrar : Primary Adapter\n(Exposes application via REST)
+note top of HexagonalRabbitListenerRegistrar : Primary Adapter\n(Exposes application via RabbitMQ)
+note top of InMemoryUserRepository : Secondary Adapter\n(Implements persistence)
+note top of RabbitMQEventPublisher : Secondary Adapter\n(Implements messaging)
+
+note as N1
+**Framework Benefits:**
+• Protocol-agnostic business logic
+• Automatic multi-protocol exposure
+• Configuration-driven adapters
+• Easy testing through DI
+• Clean separation of concerns
+end note
+
+note as N2
+**Test Project Benefits:**
+• Pure business logic in Use Cases
+• Testable without infrastructure
+• Same logic exposed via REST & RabbitMQ
+• Swappable implementations
+end note
+
+@enduml

@@ -1,0 +1,145 @@
+@startuml Package Structure - Hexagonal Architecture
+
+!define FRAMEWORK_COLOR #E8F4FD
+!define TEST_PROJECT_COLOR #FFF2CC
+!define PROTOBUF_COLOR #F8CECC
+!define CONFIG_COLOR #E1D5E7
+
+title Hexagonal Architecture - Package Structure
+
+package "dynamic-framework" <<Rectangle>> {
+    
+    package "com.unifieddto.framework.hexagonal" FRAMEWORK_COLOR {
+        
+        package "domain" FRAMEWORK_COLOR {
+            class UseCase<<interface>> FRAMEWORK_COLOR
+            class BusinessException FRAMEWORK_COLOR
+            class ValidationException FRAMEWORK_COLOR
+        }
+        
+        package "ports" FRAMEWORK_COLOR {
+            class InputValidator<<interface>> FRAMEWORK_COLOR
+        }
+        
+        package "adapters" FRAMEWORK_COLOR {
+            class UseCaseExecutor FRAMEWORK_COLOR
+            class UseCaseRegistry FRAMEWORK_COLOR
+            class HexagonalRestControllerRegistrar FRAMEWORK_COLOR
+            class HexagonalRabbitListenerRegistrar FRAMEWORK_COLOR
+            class ProtobufInputValidator FRAMEWORK_COLOR
+        }
+        
+        package "config" FRAMEWORK_COLOR {
+            class HexagonalArchitectureConfiguration CONFIG_COLOR
+        }
+    }
+}
+
+package "test-service" <<Rectangle>> {
+    
+    package "src/main/proto" PROTOBUF_COLOR {
+        file "user.proto" PROTOBUF_COLOR
+        file "order.proto" PROTOBUF_COLOR
+    }
+    
+    package "target/generated-sources/protobuf/java" PROTOBUF_COLOR {
+        package "com.unifieddto.api.user" PROTOBUF_COLOR {
+            class CreateUserRequest PROTOBUF_COLOR
+            class CreateUserResponse PROTOBUF_COLOR
+            class GetUserRequest PROTOBUF_COLOR
+            class User PROTOBUF_COLOR
+            class "..." as MoreProtobuf PROTOBUF_COLOR
+        }
+    }
+    
+    package "com.unifieddto.testservice" TEST_PROJECT_COLOR {
+        
+        package "hexagonal.usecases" TEST_PROJECT_COLOR {
+            class CreateUserUseCase TEST_PROJECT_COLOR
+            class GetUserUseCase TEST_PROJECT_COLOR
+        }
+        
+        package "hexagonal.ports" TEST_PROJECT_COLOR {
+            class UserRepository<<interface>> TEST_PROJECT_COLOR
+            class EventPublisher<<interface>> TEST_PROJECT_COLOR
+        }
+        
+        package "hexagonal.adapters" TEST_PROJECT_COLOR {
+            class InMemoryUserRepository TEST_PROJECT_COLOR
+            class RabbitMQEventPublisher TEST_PROJECT_COLOR
+        }
+        
+        package "config" TEST_PROJECT_COLOR {
+            class HexagonalTestServiceConfiguration CONFIG_COLOR
+        }
+        
+        package "service" TEST_PROJECT_COLOR {
+            class UserBusinessService TEST_PROJECT_COLOR
+            note right : Legacy code\n(to be refactored)
+        }
+        
+        package "messaging" TEST_PROJECT_COLOR {
+            class RabbitUserProducer TEST_PROJECT_COLOR
+            class KafkaUserProducer TEST_PROJECT_COLOR
+            class KafkaUserConsumer TEST_PROJECT_COLOR
+            note right : Legacy code\n(to be refactored)
+        }
+    }
+    
+    package "test" TEST_PROJECT_COLOR {
+        package "hexagonal" TEST_PROJECT_COLOR {
+            class HexagonalArchitectureTest TEST_PROJECT_COLOR
+        }
+    }
+}
+
+' Dependencies between packages
+domain ..> ports : uses
+adapters ..> domain : implements
+adapters ..> ports : uses
+config ..> adapters : configures
+config ..> domain : configures
+
+hexagonal.usecases ..> domain : implements
+hexagonal.usecases ..> hexagonal.ports : uses
+hexagonal.adapters ..> hexagonal.ports : implements
+HexagonalTestServiceConfiguration ..> hexagonal.usecases : creates
+HexagonalTestServiceConfiguration ..> hexagonal.adapters : creates
+
+hexagonal.usecases ..> com.unifieddto.api.user : uses DTOs
+HexagonalArchitectureTest ..> hexagonal.usecases : tests
+
+note as N1
+**Framework Packages:**
+• **domain**: Core business interfaces and exceptions
+• **ports**: Secondary port interfaces  
+• **adapters**: Primary adapters and infrastructure
+• **config**: Spring configuration for framework
+end note
+
+note as N2
+**Test Project Packages:**
+• **hexagonal.usecases**: Business logic implementation
+• **hexagonal.ports**: Secondary port interfaces
+• **hexagonal.adapters**: Secondary adapter implementations
+• **config**: Application-specific configuration
+• **Legacy packages**: Old code to be refactored
+end note
+
+note as N3
+**Generated Packages:**
+• **com.unifieddto.api.user**: Auto-generated from .proto files
+• Contains all DTOs used by use cases
+• Regenerated on each Maven compile
+end note
+
+note as N4
+**Key Architectural Rules:**
+• Framework packages are protocol-agnostic
+• Use cases depend only on interfaces (ports)
+• Adapters implement infrastructure concerns
+• Configuration wires everything together
+• Generated DTOs are shared contracts
+end note
+
+@enduml
